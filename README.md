@@ -15,13 +15,13 @@ library(tidyverse)
 ```
 
 ```
-## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ── Attaching core tidyverse packages ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
 ## ✔ dplyr     1.1.4     ✔ readr     2.1.5
 ## ✔ forcats   1.0.0     ✔ stringr   1.5.1
 ## ✔ ggplot2   3.5.1     ✔ tibble    3.2.1
 ## ✔ lubridate 1.9.3     ✔ tidyr     1.3.1
 ## ✔ purrr     1.0.2     
-## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ── Conflicts ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ tidyr::extract()   masks magrittr::extract()
 ## ✖ dplyr::filter()    masks stats::filter()
 ## ✖ dplyr::lag()       masks stats::lag()
@@ -64,7 +64,11 @@ total <- sapply(L, function(x) x[2]) %>% as.numeric()
 ```
 
 ```r
-hourly <- sapply(L, function(x) x[3:26], simplify = FALSE) %>% do.call(rbind, .) %>% data.frame() %>% mutate_if(is.character, as.numeric)
+hourly <-
+  sapply(L, function(x) x[3:26], simplify = FALSE) %>%
+  do.call(rbind, .) %>%
+  data.frame() %>%
+  mutate_if(is.character, as.numeric)
 ```
 
 ```
@@ -94,12 +98,14 @@ head(df) %>% knitr::kable()
 
 |date       | hour|datetime            | inches|
 |:----------|----:|:-------------------|------:|
-|2024-05-08 |    0|2024-05-08 00:00:00 |      0|
-|2024-05-08 |    1|2024-05-08 01:00:00 |      0|
-|2024-05-08 |    2|2024-05-08 02:00:00 |      0|
-|2024-05-08 |    3|2024-05-08 03:00:00 |      0|
-|2024-05-08 |    4|2024-05-08 04:00:00 |      0|
-|2024-05-08 |    5|2024-05-08 05:00:00 |      0|
+|2024-05-09 |    0|2024-05-09 00:00:00 |      0|
+|2024-05-09 |    1|2024-05-09 01:00:00 |      0|
+|2024-05-09 |    2|2024-05-09 02:00:00 |      0|
+|2024-05-09 |    3|2024-05-09 03:00:00 |      0|
+|2024-05-09 |    4|2024-05-09 04:00:00 |      0|
+|2024-05-09 |    5|2024-05-09 05:00:00 |      0|
+
+## Monthly comparison
 
 Plot the most recent $k$ years.
 Assume current month is incomplete and exclude.
@@ -107,34 +113,37 @@ Assume current month is incomplete and exclude.
 
 ```r
 k <- 4
-maxYear <- year(max(date))
-minYear <- maxYear - k
+currentYear <- year(max(date))
+minYear <- currentYear - k
 previousMonth <- month(today() %>% floor_date(unit = "month") - 1)
-fudge <- -1 + (previousMonth - 1) / 12
+spin <- -((previousMonth - 1/2) / 12) * (2 * pi)
 G <-
   df %>%
   filter(max(date) - k * 365.25 <= date) %>%
   filter(!(year(date) == year(today()) & month(date) == month(today()))) %>%
   mutate(year = year(date) %>% factor(),
-         monthday = sprintf("%d-%d-%d", maxYear, month(date), day(date)) %>% as.Date()) %>%
+         isCurrentYear = (year(date) == currentYear),
+         monthday = sprintf("%d-%d-%d", currentYear, month(date), day(date)) %>% as.Date()) %>%
   mutate(unit = floor_date(monthday, unit = "month")) %>%
-  group_by(year, unit) %>%
-  summarize(inches = sum(inches)) %>%
+  group_by(year, isCurrentYear, unit) %>%
+  summarize(inches = sum(inches, na.rm = TRUE)) %>%
   ungroup() %>%
   ggplot(aes(x = unit, y = inches)) +
-    geom_line(aes(color = year), alpha = 1/2, linewidth = 1) +
-    scale_color_viridis_d("Year", direction = -1) +
-    scale_x_date("", date_breaks = "month", date_labels = "%b") +
-    scale_y_continuous("Inches\nof\nrainfall", transform = "sqrt") +
-    coord_polar(start = -((previousMonth + fudge) / 12) * (2 * pi)) +
+    labs(title = "Monthly rainfall (inches)") +
+    geom_col(aes(fill = year, alpha = isCurrentYear), position = "dodge", show.legend = c(fill = TRUE, alpha = FALSE)) +
+    scale_fill_viridis_d("Year", direction = -1) +
+    scale_x_date("", date_breaks = "month", date_labels = "%b", expand = expansion(add = 120 * pi / 180)) +
+    scale_y_continuous("", transform = "sqrt") +
+    scale_alpha_manual(values = c(2/3, 1)) +
+    coord_polar(start = spin) +
     theme_ipsum_ps() +
-    theme(axis.title.y = element_text(angle = 0, hjust = 0.5, vjust = 0.83),
-          panel.grid.minor.x = element_blank())
+    theme(panel.grid.minor.x = element_blank(),
+          plot.title.position = "plot")
 ```
 
 ```
-## `summarise()` has grouped output by 'year'. You can override using the
-## `.groups` argument.
+## `summarise()` has grouped output by 'year', 'isCurrentYear'. You can override
+## using the `.groups` argument.
 ```
 
 ```r
@@ -205,13 +214,13 @@ sessionInfo()
 ## [19] htmltools_0.5.8.1       Rttf2pt1_1.3.12         pillar_1.9.0           
 ## [22] later_1.3.2             crayon_1.5.2            extrafontdb_1.0        
 ## [25] gfonts_0.2.0            mime_0.12               fontBitstreamVera_0.1.1
-## [28] tidyselect_1.2.1        digest_0.6.35           stringi_1.8.4          
+## [28] tidyselect_1.2.1        digest_0.6.35           stringi_1.8.3          
 ## [31] labeling_0.4.3          extrafont_0.19          fastmap_1.1.1          
 ## [34] grid_4.4.0              colorspace_2.1-0        cli_3.6.2              
 ## [37] crul_1.4.2              utf8_1.2.4              withr_3.0.0            
 ## [40] gdtools_0.3.7           scales_1.3.0            promises_1.3.0         
 ## [43] bit64_4.0.5             timechange_0.3.0        bit_4.0.5              
-## [46] ragg_1.3.1              hms_1.1.3               shiny_1.8.1.1          
+## [46] ragg_1.3.0              hms_1.1.3               shiny_1.8.1.1          
 ## [49] evaluate_0.23           knitr_1.46              viridisLite_0.4.2      
 ## [52] rlang_1.1.3             Rcpp_1.0.12             xtable_1.8-4           
 ## [55] glue_1.7.0              httpcode_0.3.0          vroom_1.6.5            

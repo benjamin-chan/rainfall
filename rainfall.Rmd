@@ -36,7 +36,11 @@ colNames <- read_lines(f, skip = 9, n_max = 1) %>% str_trim() %>% str_split("\\s
 L <- read_lines(f, skip = 11) %>% str_split("\\s+")
 date <- sapply(L, function(x) x[1]) %>% as.Date(format = "%d-%b-%Y")
 total <- sapply(L, function(x) x[2]) %>% as.numeric()
-hourly <- sapply(L, function(x) x[3:26], simplify = FALSE) %>% do.call(rbind, .) %>% data.frame() %>% mutate_if(is.character, as.numeric)
+hourly <-
+  sapply(L, function(x) x[3:26], simplify = FALSE) %>%
+  do.call(rbind, .) %>%
+  data.frame() %>%
+  mutate_if(is.character, as.numeric)
 names(hourly) <- paste0("x", colNames[3:26])
 df <-
   tibble(date, hourly) %>%
@@ -50,34 +54,39 @@ df <-
 head(df) %>% knitr::kable()
 ```
 
+## Monthly comparison
+
 Plot the most recent $k$ years.
 Assume current month is incomplete and exclude.
 
 ```{r}
 k <- 4
-maxYear <- year(max(date))
-minYear <- maxYear - k
+currentYear <- year(max(date))
+minYear <- currentYear - k
 previousMonth <- month(today() %>% floor_date(unit = "month") - 1)
-fudge <- -1 + (previousMonth - 1) / 12
+spin <- -((previousMonth - 1/2) / 12) * (2 * pi)
 G <-
   df %>%
   filter(max(date) - k * 365.25 <= date) %>%
   filter(!(year(date) == year(today()) & month(date) == month(today()))) %>%
   mutate(year = year(date) %>% factor(),
-         monthday = sprintf("%d-%d-%d", maxYear, month(date), day(date)) %>% as.Date()) %>%
+         isCurrentYear = (year(date) == currentYear),
+         monthday = sprintf("%d-%d-%d", currentYear, month(date), day(date)) %>% as.Date()) %>%
   mutate(unit = floor_date(monthday, unit = "month")) %>%
-  group_by(year, unit) %>%
-  summarize(inches = sum(inches)) %>%
+  group_by(year, isCurrentYear, unit) %>%
+  summarize(inches = sum(inches, na.rm = TRUE)) %>%
   ungroup() %>%
   ggplot(aes(x = unit, y = inches)) +
-    geom_line(aes(color = year), alpha = 1/2, linewidth = 1) +
-    scale_color_viridis_d("Year", direction = -1) +
-    scale_x_date("", date_breaks = "month", date_labels = "%b") +
-    scale_y_continuous("Inches\nof\nrainfall", transform = "sqrt") +
-    coord_polar(start = -((previousMonth + fudge) / 12) * (2 * pi)) +
+    labs(title = "Monthly rainfall (inches)") +
+    geom_col(aes(fill = year, alpha = isCurrentYear), position = "dodge", show.legend = c(fill = TRUE, alpha = FALSE)) +
+    scale_fill_viridis_d("Year", direction = -1) +
+    scale_x_date("", date_breaks = "month", date_labels = "%b", expand = expansion(add = 120 * pi / 180)) +
+    scale_y_continuous("", transform = "sqrt") +
+    scale_alpha_manual(values = c(2/3, 1)) +
+    coord_polar(start = spin) +
     theme_ipsum_ps() +
-    theme(axis.title.y = element_text(angle = 0, hjust = 0.5, vjust = 0.83),
-          panel.grid.minor.x = element_blank())
+    theme(panel.grid.minor.x = element_blank(),
+          plot.title.position = "plot")
 ggsave("rainfall.png", dpi = 300, units = "in", height = 4, width = 6)
 ```
 
