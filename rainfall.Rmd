@@ -13,6 +13,8 @@ library(magrittr)
 library(tidyverse)
 library(ggthemes)
 library(hrbrthemes)
+library(xts)
+library(forecast)
 ```
 
 Read rain gauge data from City of Portland Bureau of Environmental Services by way of USGS.
@@ -92,17 +94,59 @@ ggsave("rainfall.png", dpi = 300, units = "in", height = 5.5, width = 8.5)
 
 ![rainfall.png](rainfall.png)
 
-Create `ts` object
+
+## Time series analysis
+
+Create `xts` object
 
 ```{r}
-min <- min(df$date, na.rm = TRUE)
-max <- max(df$date, na.rm = TRUE)
-timeSeries <-
+daily <-
   df %>%
-  group_by(date) %>%
-  summarize(inches = sum(inches)) %>%
+  filter(max(date) - k * 365.25 <= date) %>%
+  mutate(unit = floor_date(date, unit = "day")) %>%
+  group_by(unit) %>%
+  summarize(n = n(),
+            inches = sum(inches, na.rm = TRUE)) %>%
   ungroup() %>%
-  ts(start = min, end = max)
+  filter(n == 24) %>%
+  select(unit, inches)
+ts <- xts(daily$inches, daily$unit)
+```
+
+Do stuff with the time series
+
+```{r}
+lag <- 30
+ma <- rollmean(ts, lag, align = "right")
+ma <- merge(ts, ma)
+ma <- data.frame(daily, ma$ma)
+G <-
+  ma %>%
+  ggplot(aes(x = unit)) +
+    labs(title = sprintf("Daily rainfall with %d-day trailing moving average (inches)", lag)) +
+    geom_point(aes(y = inches), alpha = 1/4, size = 0.5) +
+    geom_line(aes(y = ma), color = viridisLite::viridis(1), linewidth = 1) +
+    scale_x_date("", date_breaks = "6 months", date_labels = "%Y\n%b") +
+    scale_y_continuous("", transform = "sqrt") +
+    theme_ipsum_ps() +
+    theme(panel.grid.minor = element_blank(),
+          plot.title.position = "plot")
+ggsave("rainfallTimeSeries.png", dpi = 300, units = "in", height = 3, width = 10)
+```
+
+![rainfallTimeSeries.png](rainfallTimeSeries.png)
+
+```{r}
+acf(ts)
+Box.test(ts)
+pacf(ts)
+auto.arima(ts)
+autoplot(ts)
+forecast <- forecast(ts)
+autoplot(forecast)
+m <- auto.arima(ts)
+forecast <- forecast(m)
+autoplot(forecast)
 ```
 
 
