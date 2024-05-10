@@ -1,0 +1,1 @@
+knitr::knit("rainfall.Rmd", output = "README.md")
