@@ -122,7 +122,7 @@ G <-
   summarize(inches = sum(inches)) %>%
   ungroup() %>%
   ggplot(aes(x = unit, y = inches)) +
-    geom_line(aes(color = year), alpha = 1/2, size = 1) +
+    geom_line(aes(color = year), alpha = 1/2, linewidth = 1) +
     scale_color_viridis_d("Year", direction = -1) +
     scale_x_date("", date_breaks = "month", date_labels = "%b") +
     scale_y_continuous("Inches\nof\nrainfall", transform = "sqrt") +
@@ -135,14 +135,6 @@ G <-
 ```
 ## `summarise()` has grouped output by 'year'. You can override using the
 ## `.groups` argument.
-```
-
-```
-## Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
-## ℹ Please use `linewidth` instead.
-## This warning is displayed once every 8 hours.
-## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
-## generated.
 ```
 
 ```r
