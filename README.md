@@ -1,12 +1,3 @@
----
-title: "Rainfall analysis"
-author: "Benjamin Chan"
-date: 2024-05-10
-output:
-  html_document:
-    keep_md: yes
----
-
 # Rainfall analysis
 
 Rainfall analysis inspired by https://github.com/engjen/rain_pdx
