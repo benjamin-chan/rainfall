@@ -1,0 +1,90 @@
+---
+title: "Rainfall analysis"
+author: "Benjamin Chan"
+date: `r Sys.Date()`
+output:
+  html_document:
+    keep_md: yes
+---
+
+
+Forked from Jupyter Notebook https://github.com/engjen/rain_pdx
+
+Load packages
+
+```{r}
+library(magrittr)
+library(tidyverse)
+library(ggthemes)
+```
+
+Read rain gauge data from City of Portland Bureau of Environmental Services by way of USGS.
+
+> Vernon School Rain Gage - 2044 NE. Killingsworth St.  
+>  
+> PROVISIONAL, UNCORRECTED RAW DATA FROM THE CITY OF PORTLAND HYDRA NETWORK.  
+> Data are the number of tips of the rain gage bucket.  
+> Each tip is 0.01 inches of rainfall.  
+>  [`-`, missing data]  
+> Dates and times are PACIFIC STANDARD TIME.  
+
+Assume most recent day is incomplete and exclude.
+Convert *tips* to inches.
+
+```{r}
+url <- "https://or.water.usgs.gov/non-usgs/bes/vernon.rain"
+f <- tempfile()
+download.file(url, f)
+colNames <- read_lines(f, skip = 9, n_max = 1) %>% str_trim() %>% str_split("\\s+") %>% unlist()
+L <- read_lines(f, skip = 11) %>% str_split("\\s+")
+date <- sapply(L, function(x) x[1]) %>% as.Date(format = "%d-%b-%Y")
+total <- sapply(L, function(x) x[2]) %>% as.numeric()
+hourly <- sapply(L, function(x) x[3:26], simplify = FALSE) %>% do.call(rbind, .) %>% data.frame() %>% mutate_if(is.character, as.numeric)
+names(hourly) <- paste0("x", colNames[3:26])
+df <-
+  tibble(date, hourly) %>%
+  filter(date < max(date)) %>%
+  pivot_longer(starts_with("x")) %>%
+  mutate(hour = gsub("x", "", name) %>% as.integer()) %>%
+  select(-name) %>%
+  mutate(datetime = sprintf("%02d:00", hour) %>% paste(date, .) %>% as.POSIXlt(format = "%Y-%m-%d %H:%M")) %>%
+  mutate(inches = value * 0.01) %>%
+  select(-value)
+head(df) %>% knitr::kable()
+```
+
+Plot the most recent 5 years
+
+```{r}
+y <- 5
+G <-
+  df %>%
+  filter(max(date) - y * 365.25 <= date) %>%
+  mutate(year = year(date) %>% factor(),
+         month = month(date),
+         week = week(date)) %>%
+  group_by(year, week) %>%
+  summarize(inches = sum(inches)) %>%
+  ungroup() %>%
+  ggplot(aes(x = week, y = inches, color = year)) +
+    geom_line(size = 1, show.legend = FALSE) +
+    scale_x_continuous("Week") +
+    scale_y_continuous("Inches of rainfall", transform = "sqrt") +
+    scale_color_brewer(type = "qual") +
+    # coord_polar() +
+    facet_wrap(~ year, ncol = 1)
+G
+```
+
+Create `ts` object
+
+```{r}
+min <- min(df$date, na.rm = TRUE)
+max <- max(df$date, na.rm = TRUE)
+timeSeries <-
+  df %>%
+  group_by(date) %>%
+  summarize(inches = sum(inches)) %>%
+  ungroup() %>%
+  ts(start = min, end = max)
+```
