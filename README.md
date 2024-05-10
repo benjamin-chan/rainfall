@@ -147,7 +147,7 @@ G <-
 ```
 
 ```r
-ggsave("rainfall.png", dpi = 300, units = "in", height = 4, width = 6)
+ggsave("rainfall.png", dpi = 300, units = "in", height = 5.5, width = 8.5)
 ```
 
 ![rainfall.png](rainfall.png)
