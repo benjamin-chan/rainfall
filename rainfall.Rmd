@@ -7,8 +7,13 @@ output:
     keep_md: yes
 ---
 
+# Rainfall analysis
 
-Forked from Jupyter Notebook https://github.com/engjen/rain_pdx
+Rainfall analysis inspired by https://github.com/engjen/rain_pdx
+
+
+---
+
 
 Load packages
 
@@ -16,6 +21,7 @@ Load packages
 library(magrittr)
 library(tidyverse)
 library(ggthemes)
+library(hrbrthemes)
 ```
 
 Read rain gauge data from City of Portland Bureau of Environmental Services by way of USGS.
@@ -53,28 +59,38 @@ df <-
 head(df) %>% knitr::kable()
 ```
 
-Plot the most recent 5 years
+Plot the most recent $k$ years.
+Assume current month is incomplete and exclude.
 
 ```{r}
-y <- 5
+k <- 4
+maxYear <- year(max(date))
+minYear <- maxYear - k
+previousMonth <- month(today() %>% floor_date(unit = "month") - 1)
+fudge <- -1 + (previousMonth - 1) / 12
 G <-
   df %>%
-  filter(max(date) - y * 365.25 <= date) %>%
+  filter(max(date) - k * 365.25 <= date) %>%
+  filter(!(year(date) == year(today()) & month(date) == month(today()))) %>%
   mutate(year = year(date) %>% factor(),
-         month = month(date),
-         week = week(date)) %>%
-  group_by(year, week) %>%
+         monthday = sprintf("%d-%d-%d", maxYear, month(date), day(date)) %>% as.Date()) %>%
+  mutate(unit = floor_date(monthday, unit = "month")) %>%
+  group_by(year, unit) %>%
   summarize(inches = sum(inches)) %>%
   ungroup() %>%
-  ggplot(aes(x = week, y = inches, color = year)) +
-    geom_line(size = 1, show.legend = FALSE) +
-    scale_x_continuous("Week") +
-    scale_y_continuous("Inches of rainfall", transform = "sqrt") +
-    scale_color_brewer(type = "qual") +
-    # coord_polar() +
-    facet_wrap(~ year, ncol = 1)
-G
+  ggplot(aes(x = unit, y = inches)) +
+    geom_line(aes(color = year), alpha = 1/2, size = 1) +
+    scale_color_viridis_d("Year", direction = -1) +
+    scale_x_date("", date_breaks = "month", date_labels = "%b") +
+    scale_y_continuous("Inches\nof\nrainfall", transform = "sqrt") +
+    coord_polar(start = -((previousMonth + fudge) / 12) * (2 * pi)) +
+    theme_ipsum_ps() +
+    theme(axis.title.y = element_text(angle = 0, hjust = 0.5, vjust = 0.83),
+          panel.grid.minor.x = element_blank())
+ggsave("rainfall.png", dpi = 300, units = "in", height = 4, width = 6)
 ```
+
+![rainfall.png](rainfall.png)
 
 Create `ts` object
 
@@ -87,4 +103,14 @@ timeSeries <-
   summarize(inches = sum(inches)) %>%
   ungroup() %>%
   ts(start = min, end = max)
+```
+
+
+---
+
+
+Session information
+
+```{r}
+sessionInfo()
 ```
